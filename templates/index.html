@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Marella Explorer 2 — Cruise Dashboard</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v={{ now.strftime('%Y%m%d%H%M') }}">
 </head>
 <body>
 
@@ -19,46 +19,15 @@
   </div>
 </header>
 
-<!-- LOCATION PANEL -->
-<section class="location-panel phase-{{ status.phase }}">
-  <div class="location-headline">{{ status.headline }}</div>
-  <div class="location-sub">{{ status.sub }}</div>
-  {% if status.next_event %}
-  <div class="next-event">⏭ Next: {{ status.next_event }}</div>
-  {% endif %}
-  <div class="location-name">📍 {{ status.location }}</div>
-</section>
+<div class="main-content">
 
-<!-- MAP -->
-{% if status.lat %}
-<section class="map-section">
-  <div id="map"></div>
-</section>
-{% endif %}
-
+<!-- LEFT COLUMN: grid -->
+<div class="left-col">
 <div class="grid">
-
-  <!-- FLIGHTS -->
-  <section class="card">
-    <h2>✈ Flights</h2>
-    {% for f in flights %}
-    <div class="flight-card {% if f.direction == 'outbound' %}flight-out{% else %}flight-home{% endif %}">
-      <div class="flight-date">{{ f.date }}</div>
-      <div class="flight-row">
-        <span class="airport">{{ f.from_code }}</span>
-        <span class="flight-time">{{ f.from_time }}</span>
-        <span class="flight-num">{{ f.flight }}</span>
-        <span class="flight-arrow">→</span>
-        <span class="airport">{{ f.to_code }}</span>
-        <span class="flight-time">{{ f.to_time }}</span>
-      </div>
-    </div>
-    {% endfor %}
-  </section>
 
   <!-- ITINERARY -->
   <section class="card card-wide">
-    <h2>🚢 Cruise Itinerary</h2>
+    <h2>📅 Cruise Itinerary</h2>
     <table class="itinerary-table">
       <thead>
         <tr><th>Day</th><th>Date</th><th>Port</th><th>Arr</th><th>Dep</th></tr>
@@ -74,7 +43,7 @@
               🌊 En route to {{ itinerary[loop.index].port }}
             {% else %}
               ⚓ {{ entry.port }}{% if entry.country %}, {{ entry.country }}{% endif %}
-              {% if entry.excursion is defined and entry.excursion %}<div class="excursion-badge">🎒 {{ entry.excursion }}</div>{% endif %}
+              {% if entry.excursion is defined and entry.excursion %}<div class="excursion-badge">🗺️ {{ entry.excursion }}</div>{% endif %}
             {% endif %}
           </td>
           <td>{{ entry.arr if entry.arr else '—' }}</td>
@@ -85,9 +54,27 @@
     </table>
   </section>
 
+  <!-- FLIGHTS -->
+  <section class="card">
+    <h2>✈️ Flights</h2>
+    {% for f in flights %}
+    <div class="flight-card {% if f.direction == 'outbound' %}flight-out{% else %}flight-home{% endif %}">
+      <div class="flight-date">{{ f.date }}</div>
+      <div class="flight-row">
+        <span class="airport">{{ f.from_code }}</span>
+        <span class="flight-time">{{ f.from_time }}</span>
+        <span class="flight-num">{{ f.flight }}</span>
+        <span class="flight-arrow">→</span>
+        <span class="airport">{{ f.to_code }}</span>
+        <span class="flight-time">{{ f.to_time }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
   <!-- EXCURSIONS -->
   <section class="card">
-    <h2>🎒 Excursions</h2>
+    <h2>🗺️ Excursions</h2>
     {% for ex in excursions %}
     <div class="excursion-item">
       <div class="ex-day">Day {{ ex.day }}</div>
@@ -97,18 +84,54 @@
     {% endfor %}
   </section>
 
-  <!-- CONTACTS -->
-  <section class="card">
+  <!-- CONTACTS (full width, horizontal) -->
+  <section class="card card-wide">
     <h2>📞 Contacts</h2>
+    <div class="contacts-row">
     {% for c in contacts %}
     <div class="contact-item">
       <div class="contact-name">{{ c.name }}</div>
-      <div class="contact-phone">📱 {{ c.phone }}</div>
+      <div class="contact-phone">{{ c.phone }}</div>
     </div>
     {% endfor %}
+    </div>
   </section>
 
+
+</div><!-- end grid -->
+</div><!-- end left-col -->
+
+<!-- RIGHT COLUMN: location panel + map -->
+<div class="right-col">
+
+<section class="location-panel phase-{{ status.phase }}">
+  <div class="location-headline">{{ status.headline }}</div>
+  {% if status.status == 'pre_trip' %}
+  <div class="flap-board">
+    <div class="flap-cell"><span id="flap-d">--</span><div class="flap-label">DAYS</div></div>
+    <div class="flap-sep">:</div>
+    <div class="flap-cell"><span id="flap-h">--</span><div class="flap-label">HRS</div></div>
+    <div class="flap-sep">:</div>
+    <div class="flap-cell"><span id="flap-m">--</span><div class="flap-label">MINS</div></div>
+  </div>
+  {% else %}
+  <div class="location-sub">{{ status.sub }}</div>
+  {% endif %}
+  {% if status.next_event %}
+  <div class="next-event">➡️ Next: {{ status.next_event }}</div>
+  {% endif %}
+  <div class="location-name">{% if status.phase in ('pre', 'flight') %}✈️{% else %}📍{% endif %} {{ status.location }}</div>
+</section>
+
+{% if status.lat %}
+<div class="map-section">
+  <div id="map"></div>
 </div>
+{% endif %}
+
+</div><!-- end right-col -->
+
+</div><!-- end main-content -->
 
 <footer>
   <span>Next status change in <span id="countdown">{{ refresh_secs }}</span></span>
@@ -127,7 +150,7 @@ const REFRESH_SECS = {{ refresh_secs }};
 const ITINERARY = {{ itinerary_json | safe }};
 
 // Zoom level: in port → zoom in close, approaching/sea → overview
-const ZOOM = STATUS_TYPE === 'in_port' ? 12 : (STATUS_TYPE === 'approaching' ? 10 : 6);
+const ZOOM = STATUS_TYPE === 'pre_trip' ? 16 : (STATUS_TYPE === 'in_port' ? 12 : (STATUS_TYPE === 'approaching' ? 10 : 6));
 
 // Clock
 function updateClock() {
@@ -158,6 +181,24 @@ setInterval(() => {
   if (remaining <= 0) location.reload();
 }, 1000);
 
+// Pre-trip flight-board countdown
+if (STATUS_TYPE === 'pre_trip') {
+  const flapD = document.getElementById('flap-d');
+  const flapH = document.getElementById('flap-h');
+  const flapM = document.getElementById('flap-m');
+  let pretripSecs = REFRESH_SECS;
+  function updatePretrip() {
+    const d = Math.floor(pretripSecs / 86400);
+    const h = Math.floor((pretripSecs % 86400) / 3600);
+    const m = Math.floor((pretripSecs % 3600) / 60);
+    if (flapD) flapD.textContent = String(d).padStart(2, '0');
+    if (flapH) flapH.textContent = String(h).padStart(2, '0');
+    if (flapM) flapM.textContent = String(m).padStart(2, '0');
+  }
+  updatePretrip();
+  setInterval(() => { pretripSecs--; updatePretrip(); }, 1000);
+}
+
 // Poll /status every 30 s — reload immediately if status key changes
 setInterval(async () => {
   try {
@@ -170,8 +211,10 @@ setInterval(async () => {
 
 // Map
 const map = L.map('map').setView([STATUS_LAT, STATUS_LON], ZOOM);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-  attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom'
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 19
 }).addTo(map);
 
 // Current position marker

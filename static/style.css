@@ -45,6 +45,7 @@ header {
   border-bottom: 1px solid var(--border);
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 .location-panel::before {
   content: '';
@@ -70,22 +71,102 @@ header {
 .phase-port   .location-headline { color: var(--port-green); text-shadow: 0 0 20px rgba(34,197,94,0.5); }
 
 .location-sub  { font-size: 1.1rem; color: var(--muted); margin-bottom: 0.5rem; }
+
+/* FLIGHT BOARD COUNTDOWN */
+.flap-board {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.6rem auto 0.8rem;
+}
+.flap-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #0f0c00;
+  border: 1px solid #5a4500;
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  min-width: 5rem;
+  box-shadow: 0 0 12px rgba(255,200,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.flap-cell span {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 3rem;
+  font-weight: 900;
+  color: #ffd700;
+  letter-spacing: 4px;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(255,215,0,0.6);
+}
+.flap-label {
+  font-size: 0.65rem;
+  letter-spacing: 3px;
+  color: #997700;
+  text-transform: uppercase;
+  margin-top: 0.3rem;
+  font-weight: 600;
+}
+.flap-sep {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #ffd700;
+  opacity: 0.5;
+  line-height: 1;
+  align-self: flex-start;
+  margin-top: 0.55rem;
+  padding: 0 0.1rem;
+}
 .next-event    { font-size: 0.9rem; color: var(--accent2); background: rgba(255,215,0,0.1); 
                  display: inline-block; padding: 0.3rem 0.8rem; border-radius: 20px; margin-bottom: 0.4rem; }
 .location-name { font-size: 1rem; color: var(--muted); }
 
+/* MAIN CONTENT */
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* LEFT COLUMN — grid cards */
+.left-col {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.left-col .grid {
+  flex: 1;
+}
+
+/* RIGHT COLUMN — location panel + map */
+.right-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-left: 2px solid var(--border);
+  min-height: 0;
+}
+
 /* MAP */
-.map-section { height: 320px; border-bottom: 2px solid var(--border); }
+.map-section {
+  flex: 1;
+  min-height: 0;
+}
 #map { height: 100%; width: 100%; }
 .ship-icon, .port-icon { font-size: 1.4rem; background: none; border: none; }
 
 /* GRID */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
   padding: 1rem;
-  flex: 1;
+  align-content: start;
 }
 .card-wide { grid-column: span 2; }
 
@@ -176,14 +257,20 @@ header {
 .ex-desc { font-size: 0.85rem; color: var(--muted); }
 
 /* CONTACTS */
+.contacts-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+}
 .contact-item {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--border);
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 160px;
 }
-.contact-item:last-child { border-bottom: none; }
 .contact-name  { font-weight: 600; }
 .contact-phone { color: var(--accent); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; }
 

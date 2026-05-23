@@ -76,15 +76,18 @@ def get_current_status(now: datetime):
 
     # Before outbound flight
     outbound = datetime(2026, 5, 28, 6, 0)
+    flight_day = datetime(2026, 5, 28, 0, 0)
     if now < outbound:
         days_to_go = (outbound - now).days
         next_event_dt = outbound
+        at_airport = now >= flight_day
         return {
             "status": "pre_trip",
             "headline": "Holiday countdown",
             "sub": f"{days_to_go} day{'s' if days_to_go != 1 else ''} to go!",
-            "location": "Glasgow, Scotland",
-            "lat": 55.8617, "lon": -4.2583,
+            "location": "Glasgow Airport" if at_airport else "Glasgow, Scotland",
+            "lat": 55.869829854 if at_airport else 55.8617,
+            "lon": -4.426498294 if at_airport else -4.2583,
             "next_event": "Outbound flight GLA → DBV",
             "next_event_dt": outbound.isoformat(),
             "phase": "pre",
@@ -95,8 +98,7 @@ def get_current_status(now: datetime):
     if outbound <= now < outbound_land:
         return {
             "status": "flying_out",
-            "headline": "Currently in the air ✈",
-            "sub": "Glasgow → Dubrovnik  TOM1458",
+            "headline": "Currently in the air ✈️",
             "location": "Airborne",
             "lat": 44.0, "lon": 12.0,
             "next_event": "Land at Dubrovnik 10:15",
@@ -114,7 +116,6 @@ def get_current_status(now: datetime):
             return {
                 "status": "at_sea",
                 "headline": f"Day {day_number} — At sea 🌊",
-                "sub": "Cruising day",
                 "location": "Mediterranean Sea",
                 "lat": 37.5, "lon": 15.5,
                 "next_event": f"Day {day_number+1}: Arrive {ITINERARY[day_number]['port']} at {ITINERARY[day_number]['arr']}",
@@ -129,7 +130,7 @@ def get_current_status(now: datetime):
         if now_min < arr_min:
             return {
                 "status": "approaching",
-                "headline": f"Day {day_number} — Approaching {entry['port']} ⚓",
+                "headline": f"Day {day_number} — Approaching {entry['port']} 🧭",
                 "sub": f"Arriving {entry['arr']} local time",
                 "location": f"Approaching {entry['port']}, {entry['country']}",
                 "lat": entry["lat"], "lon": entry["lon"],
@@ -142,7 +143,6 @@ def get_current_status(now: datetime):
             return {
                 "status": "in_port",
                 "headline": f"Day {day_number} — In port: {entry['port']}, {entry['country']} ⚓",
-                "sub": excursion if excursion else f"Departing at {entry['dep']}",
                 "location": f"{entry['port']}, {entry['country']}",
                 "lat": entry["lat"], "lon": entry["lon"],
                 "next_event": f"Depart {entry['port']} at {entry['dep']}",
@@ -156,7 +156,6 @@ def get_current_status(now: datetime):
                 return {
                     "status": "at_sea",
                     "headline": f"Day {day_number} — Departed {entry['port']} 🌊",
-                    "sub": f"En route to {next_e['port']}, {next_e['country']}",
                     "location": "Mediterranean Sea",
                     "lat": (entry["lat"] + (next_e["lat"] or entry["lat"])) / 2,
                     "lon": (entry["lon"] + (next_e["lon"] or entry["lon"])) / 2,
@@ -172,7 +171,7 @@ def get_current_status(now: datetime):
     if cruise_end <= now < return_dep:
         return {
             "status": "disembarked",
-            "headline": "Disembarked — Dubrovnik airport 🏖",
+            "headline": "Disembarked — Dubrovnik airport 🏖️",
             "sub": "Return flight TOM1459 departs 11:15",
             "location": "Dubrovnik, Croatia",
             "lat": 42.6507, "lon": 18.0944,
@@ -184,8 +183,7 @@ def get_current_status(now: datetime):
     if return_dep <= now < return_land:
         return {
             "status": "flying_home",
-            "headline": "Currently in the air ✈",
-            "sub": "Dubrovnik → Glasgow  TOM1459",
+            "headline": "Currently in the air ✈️",
             "location": "Airborne",
             "lat": 47.0, "lon": 10.0,
             "next_event": "Land at Glasgow 13:40",
@@ -195,7 +193,7 @@ def get_current_status(now: datetime):
 
     return {
         "status": "home",
-        "headline": "Back home 🏠",
+        "headline": "Back home �",
         "sub": "What a trip!",
         "location": "Glasgow, Scotland",
         "lat": 55.8617, "lon": -4.2583,
