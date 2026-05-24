@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -6,35 +7,35 @@ from datetime import datetime, timezone, timedelta
 import json
 import math
 import requests
+import os
+
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+# Load config
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    try:
+        with open(config_path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise RuntimeError(f"config.json not found at {config_path}. Application cannot start.")
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"config.json is not valid JSON: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load config.json: {e}")
+
+CONFIG = load_config()
+
 # All times are local (Europe/London for flights, ship local for cruise ports)
-# Cruise departs Dubrovnik Day 1 = 28 May 2026 (same day as outbound flight lands)
-
-CRUISE_START = datetime(2026, 5, 28)
-
-# Route waypoints (must match the JS polylines in index.html)
-CAR_ROUTE = [
-    (55.876778687666395, -3.155061085364159),  # Home, Loanhead
-    (55.893, -3.350),
-    (55.880, -3.650),
-    (55.872, -4.000),
-    (55.86471714081724, -4.432244046978144),    # Glasgow Airport
-]
-AIR_ROUTE = [
-    (55.86471714081724, -4.432244046978144),    # Glasgow Airport
-    (53.50,  -2.00),
-    (51.50,  -0.50),
-    (48.90,   2.30),
-    (45.80,   4.80),
-    (45.10,   7.70),
-    (44.50,  11.30),
-    (43.50,  14.50),
-    (42.6507, 18.0944),                         # Dubrovnik
-]
+CRUISE_START = datetime.strptime(CONFIG.get("CRUISE_START", "2026-05-28"), "%Y-%m-%d")
+CAR_ROUTE = CONFIG.get("CAR_ROUTE", [])
+AIR_ROUTE = CONFIG.get("AIR_ROUTE", [])
+HOME_COORDS = tuple(CONFIG.get("HOME_COORDS", [55.876778687666395, -3.155061085364159]))
+GLA_COORDS = tuple(CONFIG.get("GLA_COORDS", [55.86471714081724, -4.432244046978144]))
+DBV_COORDS = tuple(CONFIG.get("DBV_COORDS", [42.6507, 18.0944]))
 
 
 def _interpolate_route(coords: list, fraction: float) -> tuple:
@@ -60,83 +61,13 @@ def _interpolate_route(coords: list, fraction: float) -> tuple:
         cumulative += seg_len
     return coords[-1]
 
-ITINERARY = [
-    {"day": 1, "port": "Dubrovnik", "country": "Croatia",  "arr": "14:00", "dep": "21:00", "at_sea": False,
-     "lat": 42.6507, "lon": 18.0944},
-    {"day": 2, "port": "At sea",    "country": "",          "arr": None,    "dep": None,    "at_sea": True,
-     "lat": None,   "lon": None},
-    {"day": 3, "port": "Valetta",   "country": "Malta",     "arr": "09:00", "dep": "18:00", "at_sea": False,
-     "lat": 35.8997, "lon": 14.5147},
-    {"day": 4, "port": "Messina",   "country": "Sicily",    "arr": "08:00", "dep": "17:00", "at_sea": False,
-     "lat": 38.1938, "lon": 15.5540},
-    {"day": 5, "port": "Argostoli", "country": "Kefalonia", "arr": "12:00", "dep": "20:00", "at_sea": False,
-     "lat": 38.1753, "lon": 20.4892,
-     "excursion": "Melissani Lake & Drogarati Cave"},
-    {"day": 6, "port": "Corfu Town","country": "Corfu",     "arr": "08:00", "dep": "17:00", "at_sea": False,
-     "lat": 39.6243, "lon": 19.9217},
-    {"day": 7, "port": "Kotor",     "country": "Montenegro","arr": "08:00", "dep": "17:00", "at_sea": False,
-     "lat": 42.4247, "lon": 18.7712,
-     "excursion": "Semi-submarine & Kotor Bay walking tour"},
-    {"day": 8, "port": "Dubrovnik", "country": "Croatia",   "arr": "04:00", "dep": "08:00", "at_sea": False,
-     "lat": 42.6507, "lon": 18.0944},
-]
-
-FLIGHTS = [
-    {
-        "date": "28 May 2026",
-        "from_code": "GLA", "from_time": "06:00",
-        "flight": "TOM1458",
-        "to_code": "DBV",   "to_time": "10:15",
-        "direction": "outbound",
-    },
-    {
-        "date": "4 June 2026",
-        "from_code": "DBV", "from_time": "11:15",
-        "flight": "TOM1459",
-        "to_code": "GLA",   "to_time": "13:40",
-        "direction": "return",
-    },
-]
-
-CONTACTS = [
-    {"name": "Marella Cruises",    "phone": "0203 636 1931",  "group": "marella"},
-    {"name": "Marella Explorer 2", "phone": "01224 345 151",  "group": "marella"},
-    {"name": "Dad",                "phone": "07921 864281",   "group": "family"},
-    {"name": "Mam",                "phone": "07597 192699",   "group": "family"},
-]
-
-EXCURSIONS = [
-    {"day": 5, "port": "Argostoli, Kefalonia", "description": "Melissani Lake & Drogarati Cave"},
-    {"day": 7, "port": "Kotor, Montenegro",    "description": "Semi-submarine & Kotor Bay walking tour"},
-]
+ITINERARY = CONFIG.get("ITINERARY", [])
+FLIGHTS = CONFIG.get("FLIGHTS", [])
+CONTACTS = CONFIG.get("CONTACTS", [])
+EXCURSIONS = CONFIG.get("EXCURSIONS", [])
 
 
-# Sea route legs — waypoints matching ROUTE_COORDS in index.html
-# Each leg: from ITINERARY[from_idx] departure → ITINERARY[to_idx] arrival
-SEA_LEGS = [
-    {"from_idx": 0, "to_idx": 2, "route": [
-        (42.6507, 18.0944), (40.50, 18.20), (39.80, 19.10),
-        (38.00, 18.00), (36.50, 15.90), (35.8997, 14.5147),
-    ]},
-    {"from_idx": 2, "to_idx": 3, "route": [
-        (35.8997, 14.5147), (36.50, 15.90), (37.80, 15.70), (38.1938, 15.5540),
-    ]},
-    {"from_idx": 3, "to_idx": 4, "route": [
-        (38.1938, 15.5540), (37.90, 15.65), (37.50, 17.00),
-        (37.50, 19.80), (38.13, 20.00), (38.1753, 20.4892),
-    ]},
-    {"from_idx": 4, "to_idx": 5, "route": [
-        (38.1753, 20.4892), (38.13, 20.00), (38.60, 20.00),
-        (39.35, 20.05), (39.6243, 19.9217),
-    ]},
-    {"from_idx": 5, "to_idx": 6, "route": [
-        (39.6243, 19.9217), (39.90, 19.90), (40.00, 19.20),
-        (40.50, 18.90), (41.50, 18.70), (42.4500, 18.5200), (42.4247, 18.7712),
-    ]},
-    {"from_idx": 6, "to_idx": 7, "route": [
-        (42.4247, 18.7712), (42.4500, 18.5200), (42.6507, 18.0944),
-    ]},
-]
+SEA_LEGS = CONFIG.get("SEA_LEGS", [])
 
 
 def _sea_position(now: datetime):
