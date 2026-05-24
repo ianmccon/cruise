@@ -30,7 +30,7 @@
     <h2>📅 Cruise Itinerary</h2>
     <table class="itinerary-table">
       <thead>
-        <tr><th>Day</th><th>Date</th><th>Port</th><th>Arr</th><th>Dep</th></tr>
+        <tr><th>Day</th><th>Date</th><th>Port</th><th>Arr</th><th>Dep</th><th class="temp-col">Temp (°C)</th></tr>
       </thead>
       <tbody>
         {% for entry in itinerary %}
@@ -48,6 +48,10 @@
           </td>
           <td>{{ entry.arr if entry.arr else '—' }}</td>
           <td>{{ entry.dep if entry.dep else '—' }}</td>
+          <td class="temp-col">
+            {% set temp = itinerary_temps[loop.index0] %}
+            {% if temp is not none %}{{ temp }}°{% else %}—{% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -84,16 +88,26 @@
     {% endfor %}
   </section>
 
-  <!-- CONTACTS (full width, horizontal) -->
+  <!-- CONTACTS (two columns) -->
   <section class="card card-wide">
     <h2>📞 Contacts</h2>
-    <div class="contacts-row">
-    {% for c in contacts %}
-    <div class="contact-item">
-      <div class="contact-name">{{ c.name }}</div>
-      <div class="contact-phone">{{ c.phone }}</div>
-    </div>
-    {% endfor %}
+    <div class="contacts-two-col">
+      <div class="contacts-col">
+        {% for c in contacts if c.group == 'marella' %}
+        <div class="contact-item">
+          <div class="contact-name">{{ c.name }}</div>
+          <div class="contact-phone">{{ c.phone }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="contacts-col">
+        {% for c in contacts if c.group == 'family' %}
+        <div class="contact-item">
+          <div class="contact-name">{{ c.name }}</div>
+          <div class="contact-phone">{{ c.phone }}</div>
+        </div>
+        {% endfor %}
+      </div>
     </div>
   </section>
 
@@ -126,6 +140,9 @@
 {% if status.lat %}
 <div class="map-section">
   <div id="map"></div>
+  {% if weather %}
+  <div class="map-weather-overlay">{{ weather.icon }} {{ weather.temp }}°C</div>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -150,7 +167,7 @@ const REFRESH_SECS = {{ refresh_secs }};
 const ITINERARY = {{ itinerary_json | safe }};
 
 // Zoom level: in port → zoom in close, approaching/sea → overview
-const ZOOM = STATUS_TYPE === 'pre_trip' ? 16 : (STATUS_TYPE === 'in_port' ? 12 : (STATUS_TYPE === 'approaching' ? 10 : 6));
+const ZOOM = STATUS_TYPE === 'pre_trip' ? 14 : (STATUS_TYPE === 'home' ? 12 : (STATUS_TYPE === 'travelling' ? 10 : (STATUS_TYPE === 'at_airport' ? 14 : (STATUS_TYPE === 'in_port' ? 12 : (STATUS_TYPE === 'approaching' ? 10 : 6)))));
 
 // Clock
 function updateClock() {
@@ -209,16 +226,79 @@ setInterval(async () => {
   } catch (_) {}
 }, 30000);
 
+// Reload every 15 minutes to update map position
+setTimeout(() => location.reload(), 15 * 60 * 1000);
+
 // Map
 const map = L.map('map').setView([STATUS_LAT, STATUS_LON], ZOOM);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
-  subdomains: 'abcd',
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
   maxZoom: 19
 }).addTo(map);
 
+// Route arrays (defined early — used by both bearing calc and polylines)
+const CAR_ROUTE = [
+  [55.876778687666395, -3.155061085364159],  // Home, Loanhead
+  [55.893, -3.350],  // A720 Edinburgh bypass west
+  [55.880, -3.650],  // M8 westbound
+  [55.872, -4.000],  // Approaching Glasgow
+  [55.864717, -4.432244],  // Glasgow Airport
+];
+const AIR_ROUTE = [
+  [55.864717, -4.432244],  // Glasgow Airport
+  [53.50,  -2.00],   // Over northern England
+  [51.50,  -0.50],   // Over London area
+  [48.90,   2.30],   // Over Paris area
+  [45.80,   4.80],   // Over Lyon area
+  [45.10,   7.70],   // Over Turin area
+  [44.50,  11.30],   // Over Bologna area
+  [43.50,  14.50],   // Crossing Adriatic
+  [42.6507, 18.0944],  // Dubrovnik
+];
+
 // Current position marker
-const currentIcon = L.divIcon({className: 'ship-icon', html: '🚢', iconSize: [32,32]});
+const CURRENT_EMOJI = ['travelling'].includes(STATUS_TYPE) ? '🚗'
+  : ['flying_out', 'flying_home'].includes(STATUS_TYPE) ? '✈️'
+  : ['home', 'pre_trip'].includes(STATUS_TYPE) ? '🏠'
+  : '🚢';
+
+// Bearing helpers for rotating the icon along its route
+function bearingDeg(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180;
+  const dLon = (lon2 - lon1) * r;
+  const y = Math.sin(dLon) * Math.cos(lat2 * r);
+  const x = Math.cos(lat1 * r) * Math.sin(lat2 * r)
+           - Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+function nearestSegmentBearing(route, lat, lon) {
+  let minD = Infinity, idx = 0;
+  for (let i = 0; i < route.length - 1; i++) {
+    const mLat = (route[i][0] + route[i+1][0]) / 2;
+    const mLon = (route[i][1] + route[i+1][1]) / 2;
+    const d = (mLat - lat) ** 2 + (mLon - lon) ** 2;
+    if (d < minD) { minD = d; idx = i; }
+  }
+  return bearingDeg(route[idx][0], route[idx][1], route[idx+1][0], route[idx+1][1]);
+}
+
+// Pick correct route direction and compute rotation
+// ✈️ default points NE (45°); 🚗 default points E (90°); 🚢 no rotation
+let iconRotation = 0;
+if (STATUS_TYPE === 'flying_out') {
+  iconRotation = nearestSegmentBearing(AIR_ROUTE, STATUS_LAT, STATUS_LON) - 45;
+} else if (STATUS_TYPE === 'flying_home') {
+  const rev = [...AIR_ROUTE].reverse();
+  iconRotation = nearestSegmentBearing(rev, STATUS_LAT, STATUS_LON) - 45;
+} else if (STATUS_TYPE === 'travelling') {
+  // Outbound if closer to home (lon > midpoint -3.79), else return
+  const outbound = STATUS_LON > -3.79;
+  const route = outbound ? CAR_ROUTE : [...CAR_ROUTE].reverse();
+  iconRotation = nearestSegmentBearing(route, STATUS_LAT, STATUS_LON) - 90;
+}
+
+const iconHtml = `<span style="display:inline-block;font-size:24px;line-height:32px;transform:rotate(${iconRotation.toFixed(1)}deg)">${CURRENT_EMOJI}</span>`;
+const currentIcon = L.divIcon({className: 'ship-icon', html: iconHtml, iconSize: [32,32], iconAnchor: [16,16], popupAnchor: [0, -24]});
 L.marker([STATUS_LAT, STATUS_LON], {icon: currentIcon})
   .addTo(map)
   .bindPopup('{{ status.location }}')
@@ -272,6 +352,12 @@ const ROUTE_COORDS = [
   [42.6507, 18.0944],  // Dubrovnik (Day 8)
 ];
 L.polyline(ROUTE_COORDS, {color:'#00bfff', weight:2, dashArray:'6,4'}).addTo(map);
+
+// Car route: Loanhead home ↔ Glasgow Airport (red)
+L.polyline(CAR_ROUTE, {color:'red', weight:2, dashArray:'6,4'}).addTo(map);
+
+// Air route: Glasgow Airport ↔ Dubrovnik (orange, approximate great circle)
+L.polyline(AIR_ROUTE, {color:'orange', weight:2, dashArray:'6,4'}).addTo(map);
 </script>
 </body>
 </html>

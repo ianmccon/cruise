@@ -73,6 +73,38 @@ header {
 .location-sub  { font-size: 1.1rem; color: var(--muted); margin-bottom: 0.5rem; }
 
 /* FLIGHT BOARD COUNTDOWN */
+.flap-weather-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+.flap-weather {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.non-flap-weather {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 0.3rem;
+}
+.map-section { position: relative; }
+.map-weather-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  background: rgba(0,0,0,0.70);
+  color: #fff;
+  font-size: 3rem;
+  font-weight: 700;
+  padding: 0.5rem 1.2rem;
+  border-radius: 12px;
+  pointer-events: none;
+  line-height: 1.2;
+}
 .flap-board {
   display: flex;
   align-items: center;
@@ -121,6 +153,7 @@ header {
 .next-event    { font-size: 0.9rem; color: var(--accent2); background: rgba(255,215,0,0.1); 
                  display: inline-block; padding: 0.3rem 0.8rem; border-radius: 20px; margin-bottom: 0.4rem; }
 .location-name { font-size: 1rem; color: var(--muted); }
+.location-weather { font-size: 1rem; color: var(--accent); font-weight: 600; }
 
 /* MAIN CONTENT */
 .main-content {
@@ -232,6 +265,16 @@ header {
   border-bottom: 1px solid rgba(42,58,85,0.5);
   vertical-align: top;
 }
+
+/* Make Temp (°C) column orange, override row coloring */
+.itinerary-table th.temp-col {
+  color: orange;
+}
+.itinerary-table tr.row-port td.temp-col,
+.itinerary-table tr.row-sea td.temp-col,
+.itinerary-table tr.row-today td.temp-col {
+  color: orange !important;
+}
 .row-sea td { color: var(--sea-blue); background: rgba(59,130,246,0.04); }
 .row-port td { color: var(--text); }
 .row-today td { background: rgba(0,191,255,0.1); border-left: 3px solid var(--accent); font-weight: 600; }
@@ -261,6 +304,16 @@ header {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem 2rem;
+}
+.contacts-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 2rem;
+}
+.contacts-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 .contact-item {
   display: flex;
