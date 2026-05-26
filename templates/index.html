@@ -13,6 +13,13 @@
     <div class="ship-name">Marella Explorer 2</div>
     <div class="cruise-subtitle">Mediterranean Cruise · May–June 2026</div>
   </div>
+  <div class="header-center">
+    {% if next_bin_icons %}
+      <div class="bin-icons" title="Bins due Thursday">
+        {% for icon in next_bin_icons %}<span class="bin-icon">{{ icon }}</span>{% endfor %}
+      </div>
+    {% endif %}
+  </div>
   <div class="header-right">
     <div class="clock" id="clock"></div>
     <div class="date-display">{{ now.strftime('%A, %-d %B %Y') }}</div>

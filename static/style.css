@@ -1,3 +1,21 @@
+/* BIN ICONS IN HEADER */
+.header-center {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+}
+.bin-icons {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 2.1rem;
+  align-items: center;
+  justify-content: center;
+}
+.bin-icon {
+  filter: drop-shadow(0 1px 2px #0008);
+}
 :root {
   --bg: #0a0e1a;
   --bg2: #111827;
@@ -32,6 +50,8 @@ header {
   padding: 1rem 1.5rem;
   background: linear-gradient(135deg, #0a0e1a 0%, #1a2a4a 100%);
   border-bottom: 2px solid var(--accent);
+  position: relative;
+}
 }
 .ship-name { font-size: 1.6rem; font-weight: 700; color: var(--accent); letter-spacing: 2px; }
 .cruise-subtitle { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }

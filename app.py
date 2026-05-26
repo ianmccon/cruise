@@ -1,28 +1,48 @@
-# Fetch current weather (temp and icon) from Open-Meteo for given lat/lon
-def get_weather(lat: float, lon: float):
-    try:
-        resp = requests.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude": lat,
-                "longitude": lon,
-                "current_weather": True,
-                "temperature_unit": "celsius",
-                "windspeed_unit": "kmh",
-                "timezone": "auto",
-            },
-            timeout=5,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        cw = data.get("current_weather", {})
-        temp = cw.get("temperature")
-        code = cw.get("weathercode")
-        icon = WEATHER_ICONS.get(code, "?")
-        return {"temp": temp, "icon": icon, "code": code}
-    except Exception as e:
-        print(f"[DEBUG] get_weather error: {e}")
-        return {"temp": None, "icon": "?", "code": None}
+import icalendar
+from datetime import date
+# Helper: fetch and parse Bins ICS, return list of bins for next Thursday
+BIN_ICS_URL = "https://user.fm/calendar/v1-7410a047c76de8e6ec2306fca1ebef77/Bins.ics"
+BIN_ICON_MAP = {
+    "Garden": "🌿",
+    "Waste": "🗑️",
+    "Paper": "📄",
+    "Recycling": "♻️",
+    "Glass": "🍾",
+}
+
+import threading
+_bin_cache = {"date": None, "bins": []}
+_bin_cache_lock = threading.Lock()
+
+def get_next_thursday_bins(now=None):
+    """Return a list of bin types due for the next Thursday (from now) using BIN_SCHEDULE."""
+    from datetime import datetime, timedelta
+    if now is None:
+        now = datetime.now()
+    # Find next Thursday
+    days_ahead = (3 - now.weekday() + 7) % 7  # 3 = Thursday
+    if days_ahead == 0 and now.hour >= 8:
+        days_ahead = 7
+    next_thu = (now + timedelta(days=days_ahead)).replace(hour=0, minute=0, second=0, microsecond=0)
+    bins_due = []
+    for sched in BIN_SCHEDULE:
+        start_date = datetime.strptime(sched["start"], "%Y-%m-%d").date()
+        freq = sched["freq"]
+        delta_weeks = (next_thu.date() - start_date).days // 7
+        if delta_weeks >= 0 and delta_weeks % freq == 0:
+            bins_due.append(sched["name"])
+    return sorted(bins_due)
+
+
+# Hardcoded bin schedule (name, start date, frequency in weeks)
+
+BIN_SCHEDULE = [
+    {"name": "Garden",    "start": "2026-05-28", "freq": 2},
+    {"name": "Waste",     "start": "2026-05-28", "freq": 3},
+    {"name": "Paper",     "start": "2026-06-11", "freq": 3},
+    {"name": "Recycling", "start": "2026-06-04", "freq": 3},
+    {"name": "Glass",     "start": "2026-06-04", "freq": 2},
+]
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -444,6 +464,14 @@ async def dashboard(request: Request):
             weather = get_weather(status["lat"], status["lon"])
         except Exception:
             weather = None
+    # Get bins for next Thursday
+    next_bins = get_next_thursday_bins(now)
+    import sys
+    print(f"[DEBUG] Next Thursday bins: {next_bins}", flush=True)
+    next_bin_icons = [BIN_ICON_MAP.get(b, "🗑️") for b in next_bins]
+    print(f"[DEBUG] Next Thursday bin icons: {next_bin_icons}", flush=True)
+    if not next_bin_icons:
+        next_bin_icons = ["❓"]
     return templates.TemplateResponse(request, "index.html", {
         "now": now,
         "status": status,
@@ -458,6 +486,8 @@ async def dashboard(request: Request):
         "timedelta": timedelta,
         "current_day": current_day,
         "weather": weather,
+        "next_bin_icons": next_bin_icons,
+        "next_bins": next_bins,
     })
 
 
