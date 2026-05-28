@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marella Explorer 2 — Cruise Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="ship-name">Marella Explorer 2</div>
+    <div class="cruise-subtitle">Mediterranean Cruise · May–June 2026</div>
+  </div>
+  <div class="header-right">
+    <div class="clock" id="clock"></div>
+    <div class="date-display">{{ now.strftime('%A, %-d %B %Y') }}</div>
+  </div>
+</header>
+
+<!-- LOCATION PANEL -->
+<section class="location-panel phase-{{ status.phase }}">
+  <div class="location-headline">{{ status.headline }}</div>
+  <div class="location-sub">{{ status.sub }}</div>
+  {% if status.next_event %}
+  <div class="next-event">⏭ Next: {{ status.next_event }}</div>
+  {% endif %}
+  <div class="location-name">📍 {{ status.location }}</div>
+</section>
+
+<!-- MAP -->
+{% if status.lat %}
+<section class="map-section">
+  <div id="map"></div>
+</section>
+{% endif %}
+
+<div class="grid">
+
+  <!-- FLIGHTS -->
+  <section class="card">
+    <h2>✈ Flights</h2>
+    {% for f in flights %}
+    <div class="flight-card {% if f.direction == 'outbound' %}flight-out{% else %}flight-home{% endif %}">
+      <div class="flight-date">{{ f.date }}</div>
+      <div class="flight-row">
+        <span class="airport">{{ f.from_code }}</span>
+        <span class="flight-time">{{ f.from_time }}</span>
+        <span class="flight-num">{{ f.flight }}</span>
+        <span class="flight-arrow">→</span>
+        <span class="airport">{{ f.to_code }}</span>
+        <span class="flight-time">{{ f.to_time }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <!-- ITINERARY -->
+  <section class="card card-wide">
+    <h2>🚢 Cruise Itinerary</h2>
+    <table class="itinerary-table">
+      <thead>
+        <tr><th>Day</th><th>Date</th><th>Port</th><th>Arr</th><th>Dep</th></tr>
+      </thead>
+      <tbody>
+        {% for entry in itinerary %}
+        {% set day_date = cruise_start + timedelta(days=entry.day - 1) %}
+        <tr class="{% if entry.at_sea %}row-sea{% else %}row-port{% endif %} {% if loop.index == current_day %}row-today{% endif %}">
+          <td>Day {{ entry.day }}</td>
+          <td>{{ day_date.strftime('%-d %b') }}</td>
+          <td>
+            {% if entry.at_sea %}
+              🌊 En route to {{ itinerary[loop.index].port }}
+            {% else %}
+              ⚓ {{ entry.port }}{% if entry.country %}, {{ entry.country }}{% endif %}
+              {% if entry.excursion is defined and entry.excursion %}<div class="excursion-badge">🎒 {{ entry.excursion }}</div>{% endif %}
+            {% endif %}
+          </td>
+          <td>{{ entry.arr if entry.arr else '—' }}</td>
+          <td>{{ entry.dep if entry.dep else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <!-- EXCURSIONS -->
+  <section class="card">
+    <h2>🎒 Excursions</h2>
+    {% for ex in excursions %}
+    <div class="excursion-item">
+      <div class="ex-day">Day {{ ex.day }}</div>
+      <div class="ex-port">{{ ex.port }}</div>
+      <div class="ex-desc">{{ ex.description }}</div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <!-- CONTACTS -->
+  <section class="card">
+    <h2>📞 Contacts</h2>
+    {% for c in contacts %}
+    <div class="contact-item">
+      <div class="contact-name">{{ c.name }}</div>
+      <div class="contact-phone">📱 {{ c.phone }}</div>
+    </div>
+    {% endfor %}
+  </section>
+
+</div>
+
+<footer>
+  <span>Next status change in <span id="countdown">{{ refresh_secs }}</span></span>
+  <span>Last updated: {{ now.strftime('%H:%M:%S') }}</span>
+</footer>
+
+<!-- Leaflet map (OpenStreetMap, no API key needed) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+const STATUS_LAT = {{ status.lat }};
+const STATUS_LON = {{ status.lon }};
+const STATUS_TYPE = '{{ status.status }}';
+const REFRESH_SECS = {{ refresh_secs }};
+const ITINERARY = {{ itinerary_json | safe }};
+
+// Zoom level: in port → zoom in close, approaching/sea → overview
+const ZOOM = STATUS_TYPE === 'in_port' ? 12 : (STATUS_TYPE === 'approaching' ? 10 : 6);
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Countdown to next scheduled event + page reload
+let remaining = REFRESH_SECS;
+const countEl = document.getElementById('countdown');
+function formatTime(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
+  if (m > 0) return `${m}m ${String(sec).padStart(2,'0')}s`;
+  return `${sec}s`;
+}
+if (countEl) countEl.textContent = formatTime(remaining);
+setInterval(() => {
+  remaining--;
+  if (countEl) countEl.textContent = formatTime(remaining);
+  if (remaining <= 0) location.reload();
+}, 1000);
+
+// Poll /status every 30 s — reload immediately if status key changes
+setInterval(async () => {
+  try {
+    const res = await fetch('/status');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.status !== STATUS_TYPE) location.reload();
+  } catch (_) {}
+}, 30000);
+
+// Map
+const map = L.map('map').setView([STATUS_LAT, STATUS_LON], ZOOM);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom'
+}).addTo(map);
+
+// Current position marker
+const currentIcon = L.divIcon({className: 'ship-icon', html: '🚢', iconSize: [32,32]});
+L.marker([STATUS_LAT, STATUS_LON], {icon: currentIcon})
+  .addTo(map)
+  .bindPopup('{{ status.location }}')
+  .openPopup();
+
+// Plot all ports
+ITINERARY.forEach(entry => {
+  if (entry.lat && entry.lon && !entry.at_sea) {
+    const icon = L.divIcon({className: 'port-icon', html: '⚓', iconSize:[24,24]});
+    L.marker([entry.lat, entry.lon], {icon})
+      .addTo(map)
+      .bindPopup(`<b>Day ${entry.day}</b><br>${entry.port}${entry.country ? ', '+entry.country : ''}<br>Arr: ${entry.arr||'—'} Dep: ${entry.dep||'—'}`);
+  }
+});
+
+// Route polyline — waypoints chosen to follow sea lanes and avoid land
+const ROUTE_COORDS = [
+  [42.6507, 18.0944],  // Dubrovnik (Day 1)
+  // ↓ south Adriatic, Otranto Strait east of Italian heel (Leuca 18.35E)
+  [40.50,  18.20],
+  [39.80,  19.10],     // East of heel tip
+  [38.00,  18.00],     // Open Ionian
+  [36.50,  15.90],     // East of Sicily
+  [35.8997, 14.5147],  // Valetta (Day 3)
+  // ↓ NE up east coast of Sicily
+  [36.50,  15.90],
+  [37.80,  15.70],
+  [38.1938, 15.5540],  // Messina (Day 4)
+  // ↓ south through Strait of Messina, east through Ionian
+  [37.90,  15.65],
+  [37.50,  17.00],
+  [37.50,  19.80],
+  // ↓ approach Argostoli from open sea to the west — avoids Kefalonia island
+  [38.13,  20.00],     // Open sea west of Kefalonia gulf entrance
+  [38.1753, 20.4892],  // Argostoli (Day 5)
+  // ↓ exit west, pass north of Kefalonia (island ends ~38.43N)
+  [38.13,  20.00],
+  [38.60,  20.00],     // North of Kefalonia, west side
+  // ↓ approach Corfu from south through the Corfu Channel
+  [39.35,  20.05],     // South entrance of Corfu Channel
+  [39.6243, 19.9217],  // Corfu (Day 6)
+  // ↓ north through Corfu Channel then cut west BEFORE Albanian coast
+  [39.90,  19.90],     // North end of Corfu Channel
+  [40.00,  19.20],     // West — Albanian coast is at 19.55E here
+  [40.50,  18.90],     // Clear of Vlorë (40.46N 19.49E)
+  [41.50,  18.70],     // Mid Adriatic north
+  [42.4500, 18.5200],  // Kotor Bay entrance (Herceg Novi)
+  [42.4247, 18.7712],  // Kotor (Day 7)
+  // ↓ exit bay, NW to Dubrovnik
+  [42.4500, 18.5200],
+  [42.6507, 18.0944],  // Dubrovnik (Day 8)
+];
+L.polyline(ROUTE_COORDS, {color:'#00bfff', weight:2, dashArray:'6,4'}).addTo(map);
+</script>
+</body>
+</html>

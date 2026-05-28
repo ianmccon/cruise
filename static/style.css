@@ -1,0 +1,207 @@
+:root {
+  --bg: #0a0e1a;
+  --bg2: #111827;
+  --card: #1a2235;
+  --border: #2a3a55;
+  --accent: #00bfff;
+  --accent2: #ffd700;
+  --text: #e8f0fe;
+  --muted: #8899bb;
+  --port-green: #22c55e;
+  --sea-blue: #3b82f6;
+  --flight-amber: #f59e0b;
+  --red: #ef4444;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #0a0e1a 0%, #1a2a4a 100%);
+  border-bottom: 2px solid var(--accent);
+}
+.ship-name { font-size: 1.6rem; font-weight: 700; color: var(--accent); letter-spacing: 2px; }
+.cruise-subtitle { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+.clock { font-size: 2rem; font-weight: 700; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.date-display { color: var(--muted); font-size: 0.9rem; text-align: right; margin-top: 2px; }
+
+/* LOCATION PANEL */
+.location-panel {
+  padding: 1.5rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+.location-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  background: radial-gradient(ellipse at center, #ffffff 0%, transparent 70%);
+}
+.location-panel.phase-pre   { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); }
+.location-panel.phase-flight { background: linear-gradient(135deg, #1a1a2e 0%, #2d1b4e 100%); border-bottom-color: var(--flight-amber); }
+.location-panel.phase-sea   { background: linear-gradient(135deg, #0c1f3f 0%, #0a2a4a 100%); border-bottom-color: var(--sea-blue); }
+.location-panel.phase-port  { background: linear-gradient(135deg, #0d2818 0%, #0f3a20 100%); border-bottom-color: var(--port-green); }
+
+.location-headline {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--accent);
+  text-shadow: 0 0 20px rgba(0,191,255,0.5);
+  margin-bottom: 0.3rem;
+}
+.phase-flight .location-headline { color: var(--flight-amber); text-shadow: 0 0 20px rgba(245,158,11,0.5); }
+.phase-sea    .location-headline { color: #60a5fa; text-shadow: 0 0 20px rgba(96,165,250,0.5); }
+.phase-port   .location-headline { color: var(--port-green); text-shadow: 0 0 20px rgba(34,197,94,0.5); }
+
+.location-sub  { font-size: 1.1rem; color: var(--muted); margin-bottom: 0.5rem; }
+.next-event    { font-size: 0.9rem; color: var(--accent2); background: rgba(255,215,0,0.1); 
+                 display: inline-block; padding: 0.3rem 0.8rem; border-radius: 20px; margin-bottom: 0.4rem; }
+.location-name { font-size: 1rem; color: var(--muted); }
+
+/* MAP */
+.map-section { height: 320px; border-bottom: 2px solid var(--border); }
+#map { height: 100%; width: 100%; }
+.ship-icon, .port-icon { font-size: 1.4rem; background: none; border: none; }
+
+/* GRID */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  flex: 1;
+}
+.card-wide { grid-column: span 2; }
+
+/* CARDS */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.card h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* FLIGHTS */
+.flight-card {
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  border-left: 4px solid var(--flight-amber);
+  background: rgba(245,158,11,0.07);
+}
+.flight-home { border-left-color: var(--port-green); background: rgba(34,197,94,0.07); }
+.flight-date { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; }
+.flight-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  flex-wrap: wrap;
+}
+.airport { color: var(--accent2); font-size: 1.2rem; font-weight: 800; }
+.flight-time { color: var(--text); }
+.flight-num { color: var(--muted); font-size: 0.85rem; }
+.flight-arrow { color: var(--accent); font-size: 1.2rem; }
+
+/* ITINERARY TABLE */
+.itinerary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.itinerary-table th {
+  text-align: left;
+  color: var(--muted);
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+.itinerary-table td {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid rgba(42,58,85,0.5);
+  vertical-align: top;
+}
+.row-sea td { color: var(--sea-blue); background: rgba(59,130,246,0.04); }
+.row-port td { color: var(--text); }
+.row-today td { background: rgba(0,191,255,0.1); border-left: 3px solid var(--accent); font-weight: 600; }
+.excursion-badge {
+  font-size: 0.75rem;
+  color: var(--accent2);
+  background: rgba(255,215,0,0.1);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  margin-top: 0.2rem;
+  display: inline-block;
+}
+
+/* EXCURSIONS */
+.excursion-item {
+  background: rgba(255,215,0,0.05);
+  border: 1px solid rgba(255,215,0,0.2);
+  border-radius: 8px;
+  padding: 0.7rem;
+}
+.ex-day  { font-size: 0.75rem; color: var(--accent2); font-weight: 700; text-transform: uppercase; }
+.ex-port { font-weight: 600; margin: 0.2rem 0; }
+.ex-desc { font-size: 0.85rem; color: var(--muted); }
+
+/* CONTACTS */
+.contact-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.contact-item:last-child { border-bottom: none; }
+.contact-name  { font-weight: 600; }
+.contact-phone { color: var(--accent); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; }
+
+/* FOOTER */
+footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 1.5rem;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+  .card-wide { grid-column: span 1; }
+  .location-headline { font-size: 1.4rem; }
+  .clock { font-size: 1.5rem; }
+  .ship-name { font-size: 1.2rem; }
+}
