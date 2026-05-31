@@ -1,3 +1,28 @@
+# Fetch current weather (temp and icon) from Open-Meteo for given lat/lon
+def get_weather(lat: float, lon: float):
+    try:
+        resp = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "current_weather": True,
+                "temperature_unit": "celsius",
+                "windspeed_unit": "kmh",
+                "timezone": "auto",
+            },
+            timeout=5,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        cw = data.get("current_weather", {})
+        temp = cw.get("temperature")
+        code = cw.get("weathercode")
+        icon = WEATHER_ICONS.get(code, "?")
+        return {"temp": temp, "icon": icon, "code": code}
+    except Exception as e:
+        print(f"[DEBUG] get_weather error: {e}")
+        return {"temp": None, "icon": "?", "code": None}
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -363,7 +388,9 @@ _weather_cache = {}
 def get_max_temp_for_day(lat: float, lon: float, date: datetime) -> int | None:
     """Fetch max temp for a given day at lat/lon using Open-Meteo API (no API key needed), with in-memory cache."""
     cache_key = (round(lat, 4), round(lon, 4), date.strftime("%Y-%m-%d"))
+    print(f"[DEBUG] get_max_temp_for_day: lat={lat}, lon={lon}, date={date.strftime('%Y-%m-%d')}")
     if cache_key in _weather_cache:
+        print(f"[DEBUG]  → cache hit: {_weather_cache[cache_key]}")
         return _weather_cache[cache_key]
     try:
         r = requests.get(
@@ -384,10 +411,13 @@ def get_max_temp_for_day(lat: float, lon: float, date: datetime) -> int | None:
         temps = data.get("daily", {}).get("temperature_2m_max", [])
         if temps:
             temp = round(temps[0])
+            print(f"[DEBUG]  → API result: {temp}")
             _weather_cache[cache_key] = temp
             return temp
-    except Exception:
-        pass
+        else:
+            print(f"[DEBUG]  → API result: no temps found")
+    except Exception as e:
+        print(f"[DEBUG]  → API error: {e}")
     _weather_cache[cache_key] = None
     return None
 
